@@ -14,18 +14,17 @@ from scaleway.secret.v1alpha1.api import (AccessSecretVersionResponse, Secret,
 
 DOCUMENTATION = r'''
 ---
-module: keeper_get
+module: get_secret
 short_description: Get value(s) from the Keeper Vault
 version_added: "1.0.0"
 description:
-    - Copy a value from the Keeper Vault into a variable.
-    - If value is not a literal value, the structure will be retrieved.
+    - Copy a value from the Scaleway Secret Manager into a variable.
 author:
-    - John Walstra
+    - Fabrice Sodogandji
 options:
   uid:
     description:
-    - The UID of the Keeper Vault record.
+    - The UUID of the scaleway secret.
     type: str
     required: no
   field:
@@ -34,78 +33,31 @@ options:
     - If the value has a complex value, use notation to get the specific value from the complex value.
     type: str
     required: no
-  custom_field:
-    description:
-    - The label, or type, of the user added customer field in record that contains the value.
-    - If the value has a complex value, use notation to get the specific value from the complex value.
-    type: str
-    required: no
-  file:
-    description:
-    - The file name of the file that contains the value.
-    type: str
-    required: no
-  allow_array:
-    description:
-    - Allow array of values instead of taking the first value.
-    - If enabled, the value will be returned in array even if single value.
-    - This does not work with notation since notation defines if an array is returned.
-    type: bool
-    default: no
-    required: no 
-  notation:
-    description:
-    - The Keeper notation to access record that contains the value.
-    - Use notation when you want a specific value.
-    - 
-    - See https://docs.keeper.io/secrets-manager/secrets-manager/about/keeper-notation for more information/
-    type: str
-    required: no
-    version_added: '1.0.1'  
 '''
 
 EXAMPLES = r'''
 - name: Get login name
-  keeper_copy:
-    uid: XXX
-    field: login
-  register: my_login_value
-- name: Get login name via notation
-  keeper_copy:
-    notation: XXX/field/login
-  register: my_login_value
-- name: Get custom field
-  keeper_copy:
-    uid: XXX
-    custom_field: Custom Label
-  register: my_custom_value
+  get_secret:
+    uid: 5E20B724-72C9-4778-9BC5-059075D9936E
+  register: my_secret_value
 '''
 
 RETURN = r'''
 value:
   description: The secret value
   returned: success
-  sample: |
-    [
+  my_secret_value: |
       {
-        "ext": "6666",
-        "number": "(555) 353-8686",
-        "type": "Work"
-      },
-      {
-        "ext": "5555",
-        "number": "111-2223333",
-        "region": "AD",
-        "type": "Mobile"
+        "login": "foo",
+        "password": "bar"
       }
-    ]      
 '''
 class MySecret():
     """ A class containing  common method used by the Ansible plugin and also talked to Scaleway Python SDK
     """
     
-    def __init__(self, secret, **kwargs):
-        self.secret = secret
+    def __init__(self,  **kwargs):
+        # self.secret = secret
         self.kwargs = kwargs
         self.client = Client.from_config_file_and_env()
         self.secret = SecretV1Alpha1API(self.client)
@@ -194,18 +146,15 @@ class MySecret():
 #         return result
 
 
+
 class ActionModule(ActionBase):
     """Action plugin to retrieve secrets from a secret manager"""
     def run(self, tmp=None, task_vars=None):
         super(ActionModule, self).run(tmp, task_vars)
         secret_id = self._task.args.get('secret_id')
-        url = "https://secrets.example.com/secret/{}".format(secret_id)
-        headers = {'Authorization': 'Bearer YOUR_TOKEN'}
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            self.fail_json(msg="Failed to retrieve secret from secret manager: {}".format(response))
-        secret = response.json()
-        return secret
+        secret = MySecret()
+        return secret.access_secret_last_updated_enabled_version(secret_id)
+
 
 def main():
   """Main function"""
@@ -214,7 +163,7 @@ def main():
             secret_id=dict(type='str', required=True),
         )
     )
-  secret = ActionModule().run(module.params)
+  secret = ActionModule.run(module.params)
   module.exit_json(secret=secret)
 
 if __name__ == '__main__':
