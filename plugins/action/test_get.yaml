@@ -1,0 +1,17 @@
+---
+- name: Scaleway Secet manager GET
+  hosts: localhost
+  vars:
+    uidu: "23a6e457-6bac-43f0-9fc8-0b62031ea466"
+    max_clients: 200
+
+  tasks:
+  - name: "Get Value"
+    get_secret:
+      uid: "{{ uidu }}"
+    register: "my_password"
+
+  - name: "Print Password"
+    debug:
+      var: my_password.value
+      verbosity: 0

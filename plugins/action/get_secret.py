@@ -1,14 +1,17 @@
-import ansible.module_utils.common.yaml
-import ansible.module_utils.compat.importlib
-import ansible.module_utils.compat.typing
-import ansible.module_utils.compat.version
-from ansible.errors import AnsibleError
+
+import base64
+import uuid
+
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.common import *
-from ansible.plugins.action import ActionBase
 from scaleway import Client
 from scaleway.secret.v1alpha1.api import (AccessSecretVersionResponse, Secret,
                                           SecretV1Alpha1API)
+
+from secret import ScalewaySecret
+
+# from scaleway import Client
+# from scaleway.secret.v1alpha1.api import (AccessSecretVersionResponse, Secret,
+#                                           SecretV1Alpha1API)
 
 # from keeper_secrets_manager_ansible import KeeperAnsible
 
@@ -38,7 +41,7 @@ options:
 EXAMPLES = r'''
 - name: Get login name
   get_secret:
-    uid: 5E20B724-72C9-4778-9BC5-059075D9936E
+    uuid: 5E20B724-72C9-4778-9BC5-059075D9936E
   register: my_secret_value
 '''
 
@@ -52,6 +55,7 @@ value:
         "password": "bar"
       }
 '''
+
 class MySecret():
     """ A class containing  common method used by the Ansible plugin and also talked to Scaleway Python SDK
     """
@@ -90,25 +94,26 @@ class MySecret():
     def access_secret_last_updated_enabled_version(self, secret_id) -> AccessSecretVersionResponse:
         """Return the last updated enabled version of a secret"""
         last_updated_enabled_version = self.get_secret_last_updated_enabled_version(secret_id)
-        data = self.secret.access_secret_version(secret_id=secret_id, revision=last_updated_enabled_version)
+        data = self.secret.access_secret_version(secret_id=secret_id, revision=last_updated_enabled_version).data
 
         return data
 
     def access_secret_version_by_revision(self, secret_id, revision) -> AccessSecretVersionResponse:
         """Return the secret version of a secret"""
-        data = self.secret.access_secret_version(secret_id=secret_id, revision=revision)
+        data = self.secret.access_secret_version(secret_id=secret_id, revision=revision).data
         return data
 
-    def get_secret_by_name(self, name: str, secret: SecretV1Alpha1API, project_id: str = None) -> Secret | None:       
+    def get_secret_by_name(self, name: str,  project_id: str = None) -> Secret | None:       
         """Return the secret version of a secret"""
-        for i in secret.list_secrets().secrets:
+        for i in self.secret.list_secrets().secrets:
             if i.name == name:
                 return i
         return None
 
-
     def access_secret_version_by_name(self, secret_name) -> AccessSecretVersionResponse:
         """Return the secret version of a secret"""
+        secret_id = self.get_secret_by_name(secret_name)
+        data = self.access_secret_last_updated_enabled_version(secret_id)
         data = self.secret.access_secret_version(secret_id=secret_name)
         return data
 
@@ -146,25 +151,99 @@ class MySecret():
 #         return result
 
 
-
-class ActionModule(ActionBase):
-    """Action plugin to retrieve secrets from a secret manager"""
-    def run(self, tmp=None, task_vars=None):
-        super(ActionModule, self).run(tmp, task_vars)
-        secret_id = self._task.args.get('secret_id')
-        secret = MySecret()
-        return secret.access_secret_last_updated_enabled_version(secret_id)
+# class ActionModule(ActionBase):
+#     """Action plugin to retrieve secrets from a secret manager"""
+#     def run(self, tmp=None, task_vars=None):
+#         super(ActionModule, self).run(tmp, task_vars)
+#         secret_id = self._task.args.get('secret_id')
+#         secret = MySecret()
+#         return secret.access_secret_last_updated_enabled_version(secret_id)
 
 
 def main():
-  """Main function"""
-  module = AnsibleModule(
-        argument_spec=dict(
-            secret_id=dict(type='str', required=True),
-        )
+
+    
+    # secret = MySecret()
+    secret = ScalewaySecret()
+    # define available arguments/parameters a user can pass to the module
+    module_args = dict(
+        secret_id=dict(type='str',required=False),
+        name=dict(type='str', required=False),
     )
-  secret = ActionModule.run(module.params)
-  module.exit_json(secret=secret)
+
+    # seed the result dict in the object
+    # we primarily care about changed and state
+    # changed is if this module effectively modified the target
+    # state will include any data that you want your module to pass back
+    # for consumption, for example, in a subsequent task
+    result = dict(
+        changed=False,
+        message=''
+    )
+
+    # the AnsibleModule object will be our abstraction working with Ansible
+    # this includes instantiation, a couple of common attr would be the
+    # args/params passed to the execution, as well as if the module
+    # supports check mode
+    module = AnsibleModule(
+        argument_spec=module_args,
+        supports_check_mode=True
+    )
+
+    # if the user is working with this module in only check mode we do not
+    # want to make any changes to the environment, just return the current
+    # state with no modifications
+    if module.check_mode:
+        module.exit_json(**result)
+
+    # during the execution of the module, if there is an exception or a
+    # conditional state that effectively causes a failure, run
+    # AnsibleModule.fail_json() to pass in the message and the result
+    if module.params['name'] == 'fail me':
+        result['message'] = 'Outch !!!'
+        module.fail_json(msg='The module Failed', **result)
+
+    # use whatever logic you need to determine whether or not this module
+    # made any modifications to your target
+    if "secret_id" in module.params:
+        #  module.params.has_key("secret_id"):    
+        result['changed'] = True
+        secret_id =  module.params['secret_id']
+        my_result =  secret.access_secret_last_updated_enabled_version(secret_id)
+
+    elif "name" in module.params:
+        #  module.params.has_key("secret_id"):    
+        result['changed'] = True
+        secret_name =  module.params['name']
+        my_result =  secret.access_secret_last_updated_enabled_version(secret_id)
+        
+    result['message'] =  my_result
+
+    # in the event of a successful module execution, you will want to
+    # simple AnsibleModule.exit_json(), passing the key/value results
+    module.exit_json(**result)
+
+# if __name__ == '__main__':
+#     main()
+
+# class ActionModule(ActionBase):
+#     """Action plugin to retrieve secrets from a secret manager"""
+#     def run(self, tmp=None, task_vars=None):
+#         super(ActionModule, self).run(tmp, task_vars)
+#         secret_id = self._task.args.get('secret_id')
+#         secret = MySecret()
+#         return secret.access_secret_last_updated_enabled_version(secret_id)
+
+
+# def main():
+#   """Main function"""
+#   module = AnsibleModule(
+#         argument_spec=dict(
+#             secret_id=dict(type='str', required=True),
+#         )
+#     )
+#   secret = ActionModule.run(module.params)
+#   module.exit_json(secret=secret)
 
 if __name__ == '__main__':
     main()

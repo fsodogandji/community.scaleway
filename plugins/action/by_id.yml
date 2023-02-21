@@ -1,0 +1,13 @@
+- name: secret-manager test
+  hosts: localhost
+  vars:
+    secret_id: "2017b507-1d3e-4ac2-8f16-61bf903b5a63"
+    secret_name: "test2" 
+  tasks:
+  - name: get secret by uuid
+    get_secret:
+      secret_id:  "{{ secret_id }}"
+    register: output
+  - name: dump test output
+    debug:
+      var: output.message

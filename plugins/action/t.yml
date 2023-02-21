@@ -1,0 +1,11 @@
+- name: Test de mon module
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Hello Steph
+    hello:
+      name: 'not fail me'
+    register: output
+  - name: dump test output
+    debug:
+      var: output.message
