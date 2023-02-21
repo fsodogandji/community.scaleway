@@ -57,7 +57,6 @@ class ScalewaySecret():
             if i.name == name:
                 return i
         return None
-
     def access_secret_version_by_name(self, secret_name) -> AccessSecretVersionResponse:
         """Return the secret version of a secret"""
         secret_id = self.get_secret_by_name(secret_name)
