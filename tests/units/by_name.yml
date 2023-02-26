@@ -2,12 +2,12 @@
   hosts: localhost
   vars:
     secret_id: "23a6e457-6bac-43f0-9fc8-0b62031ea466"
-    secret_name: "test2" 
+    name: "hello_there" 
   connection: local
   tasks:
-  - name: get secret by name
-    get_secret:
-      name:  "{{ secret_name }}"
+  - name: access secret by name
+    access_secret:
+      name:  "{{ name }}"
       
     register: output
   - name: dump test output

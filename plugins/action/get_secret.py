@@ -215,7 +215,7 @@ def main():
         #  module.params.has_key("secret_id"):    
         result['changed'] = True
         secret_name =  module.params['name']
-        my_result =  secret.access_secret_last_updated_enabled_version(secret_id)
+        my_result =  secret.get_secret_by_name(secret_name)
         
     result['message'] =  my_result
 

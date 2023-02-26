@@ -1,0 +1,91 @@
+- name: secret-manager test
+  hosts: localhost
+  vars:
+    secret_name_length: 8
+    project_id: "55a4141e-16e7-4150-a8fe-8405f8ef2bb5"
+    password_length: 12
+    password_specs:
+    - printable
+  tasks:
+  - name: password generation
+    set_fact:
+      data: "{{ lookup('password', '/dev/null length={{ password_length }} chars=printable')}}"
+
+  - name: secret name generation
+    set_fact:
+      secret_name_generated: "{{ lookup('password', '/dev/null length={{ secret_name_length }} chars=ascii_uppercase')}}"     
+
+  - name: create a new secret named {{ secret_name_generated }} with an initial version 
+    create_secret_version:
+      data: "{{ data }}" 
+      name: "{{ secret_name_generated }}"
+      project_id: "{{ project_id }}"
+      description: "test secret"
+      tags:
+        - "test"
+        - "test2"
+        - "test3"
+        - "test4-{{ secret_name_generated }}"
+
+    register: output
+  - name: dump test output
+    debug:
+      var: output.secret
+
+  - name: password generation
+    set_fact:
+      data: "{{ lookup('password', '/dev/null length={{ password_length }} chars=printable')}}"
+
+  - name: create a second version of the secret named {{ secret_name_generated }} with a new password 
+    create_secret_version:
+      data: "{{ data }}" 
+      name: "{{ secret_name_generated }}"
+      project_id: "{{ project_id }}"
+    register: output      
+  - name: dump test output
+    debug:
+      var: output.secret
+
+  - name: password generation
+    set_fact:
+      data: "{{ lookup('password', '/dev/null length={{ password_length }} chars=printable')}}"
+
+  - name: create a third version of the secret  {{ output.secret.secret_id }} with a new password 
+    create_secret_version:
+      data: "{{ data }}" 
+      secret_id: "{{ output.secret.secret_id }}"
+      project_id: "{{ project_id }}"
+    register: output      
+  - name: dump test output
+    debug:
+      var: output.secret
+
+  - name: access  the latest version of the secret named {{ secret_name_generated  }}
+    access_secret:
+      name:  "{{ secret_name_generated }}"
+      
+    register: output_access
+  - name: dump test output
+    debug:
+      var: output_access.message
+     
+  - name: access  the latest version of the secret  {{ output.secret.secret_id  }}
+    access_secret:
+      secret_id:  "{{ output.secret.secret_id }}"
+      
+    register: output_access
+  - name: dump test output
+    debug:
+      var: output_access.message
+
+
+  - name: access  the second version of the secret  {{ output.secret.secret_id  }}
+    access_secret:
+      secret_id:  "{{ output.secret.secret_id }}"
+      revision: 2
+      
+    register: output
+  - name: dump test output
+    debug:
+      var: output.message
+

@@ -18,9 +18,9 @@ def get_secret_by_name(secret_api, name: str) -> Secret | None:
         if len(list_secrets) == 1:
             return list_secrets.pop()    
         elif   len(list_secrets)  > 1:
-            raise ValueError("Cannot get the secret by name because there is more than one secret with this name: {name}")
+            raise Exception("A secret with this name already exists")
         else:
-           return None
+            raise Exception(f"There is no secret with this name: {name}")
 
 def main():
 
@@ -32,16 +32,13 @@ def main():
     # define available arguments/parameters a user can pass to the module
     module_args = dict(
         secret_id=dict(type='str',required=False),
-        region = dict(type='str',required=False), 
+        region = dict(type='str',required=False),
         name=dict(type='str',required=False),
         project_id=dict(type='str', required=False),
         description =dict(type='str', required=False),
-        data=dict(type='str', required=True),
-        tags=dict(type='list', required=False),
-        destroy_previous_versions=dict(type='bool', required=False),
-
+        revision =dict(type='int', required=False),  
     )
-    mutually_exclusive_args = [('secret_id','secret_name')]
+    mutually_exclusive_args = [('secret_id'),('secret_name')]
     # seed the result dict in the object
     # we primarily care about changed and state
     # changed is if this module effectively modified the target
@@ -66,7 +63,6 @@ def main():
     # state with no modifications
     if module.check_mode:
         module.exit_json(**result)
-        
 
     # during the execution of the module, if there is an exception or a
     # conditional state that effectively causes a failure, run
@@ -74,46 +70,32 @@ def main():
 
     # use whatever logic you need to determine whether or not this module
     # made any modifications to your target
-    # revision  = module.params['revision']
-    # revision  = 'latest' if revision is None else revision
-    description = module.params['description']
-    region = module.params['region']
-    data = module.params['data'].encode()
-    data = base64.b64encode(data).decode()
     project_id = module.params['project_id']
-    tags = module.params['tags']
-    print(tags, type(tags))
-    
-    if not isinstance(tags, list) and tags is not None:
-        module.fail_json(msg='tags parameter must be a list')
+    revision  = module.params['revision']
+
     # print(module.params)
     if  module.params['secret_id']:
-        secret_id =  module.params['secret_id']
-        secret_version = secret_api.create_secret_version(secret_id=secret_id,data=data)
-        secret_revision = secret_version.revision
-        secret = secret_api.get_secret(secret_id=secret_id)
-        name = secret.name
         result['changed'] = True
+        secret_id =  module.params['secret_id']
+        secret = secret_api.get_secret(secret_id=secret_id)
         # my_result =  secret.create_secret_version(secret_id=secret_id, data=secret_value)
     else:
         name = module.params['name']
-        secret = get_secret_by_name(secret_api = secret_api, name=name)
-        if  secret:
-            secret_version = secret_api.create_secret_version(secret_id = secret.id, data=data,
-                                                                             description=description,
-                                                                                region=region) 
-            secret_id = secret_version.secret_id
-            secret_revision = secret_version.revision
-        else:
-            secret = secret_api.create_secret(project_id=project_id, name=name,tags=tags,
-                                                   region=region)
-            secret_id = secret.id
-            secret_version = secret_api.create_secret_version(secret_id=secret_id,data=data)
-            secret_revision = secret_version.revision
-        result['changed'] = True
+        secret_id = get_secret_by_name(secret_api,name=name).id
+        print('**************',secret_id)
+        # print(data,type(data))
+    revision  = 'latest' if revision is None else revision
+    secret = secret_api.access_secret_version(secret_id=secret_id, revision=revision)
+    data = base64.b64decode(secret.data)
+    # elif "name" in module.params:
+    #     #  module.params.has_key("secret_id"):    
+    #     result['changed'] = True
+    #     secret_name =  module.params['name']
+    #     my_result =  secret.access_secret_last_updated_enabled_version(secret_id)
         
-    result['secret'] = OrderedDict( {'name':name,'secret_id': secret_id,
-                                        'revision': secret_revision,'description': description, 'tags':tags} )
+    result['message'] = data
+                        
+
     # in the event of a successful module execution, you will want to
     # simple AnsibleModule.exit_json(), passing the key/value results
     module.exit_json(**result)
